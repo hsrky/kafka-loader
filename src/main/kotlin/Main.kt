@@ -27,23 +27,21 @@ class Main : CliktCommand() {
         println("Kafka configuration: $props")
 
         listTopics(props)
-
-        val producer = KafkaProducer<String, String>(props)
-
         var count = 0
         val startTime = Instant.now()
-        File(data).forEachLine {
-            if (count == 0 || count % 10000 == 0) {
-                println("Sending $count records..")
+        KafkaProducer<String, String>(props).use { producer ->
+            File(data).forEachLine {
+                if (count == 0 || count % 10000 == 0) {
+                    println("Sending $count records..")
+                }
+                val rec = ProducerRecord<String, String>(topic, it)
+                //rec.headers().add("no", "${count+1}".toByteArray())
+                producer.send(rec)
+                count++
             }
-            val rec = ProducerRecord<String, String>(topic, it)
-            //rec.headers().add("no", "${count+1}".toByteArray())
-            producer.send(rec)
-            count++
+            producer.flush()
         }
 
-        producer.flush()
-        producer.close()
         val spent = Duration.between(startTime, Instant.now()).seconds.coerceAtLeast(1)
         val rps = count / spent
         println("Done. Spent $spent seconds for $count records. Perf: ~ $rps rps")
